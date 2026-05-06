@@ -1,0 +1,77 @@
+name: Automated AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze_code:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::319310747432:role/GitHubActionsServiceRole # Replace with your IAM Role ARN
+          aws-region: us-east-1
+
+      - name: Extract Pull Request Diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          # Generate diff from common ancestor to head
+          git diff origin/${{ github.event.pull_request.base.ref }}...${{ github.event.pull_request.head.ref }} > pr.diff
+          DIFF_CONTENT=$(cat pr.diff)
+          
+          # JSON escape the diff content
+          echo "diff_content<<EOF" >> $GITHUB_ENV
+          echo "$DIFF_CONTENT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Send Diff to Lambda
+        id: review
+        env:
+          LAMBDA_URL: ${{ secrets.AWS_LAMBDA_FUNCTION_URL }} # Stored in GitHub Secrets
+        run: |
+          # Use Python to safely package and send the JSON payload
+          python3 -c "
+          import json, urllib.request, os
+          
+          diff_text = os.environ['diff_content']
+          url = os.environ['LAMBDA_URL']
+          
+          data = {'diff': diff_text}
+          req = urllib.request.Request(
+              url, 
+              data=json.dumps({'body': json.dumps(data)}).encode('utf-8'), 
+              headers={'Content-Type': 'application/json'}, 
+              method='POST'
+          )
+          
+          with urllib.request.urlopen(req) as response:
+              res = json.loads(response.read().decode('utf-8'))
+              body = json.loads(res['body'])
+              print('REVIEW<<EOF')
+              print(body['review'])
+              print('EOF')
+          " >> $GITHUB_ENV
+
+      - name: Post Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## Automated AI PR Review
+
+            ${{ env.REVIEW }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
