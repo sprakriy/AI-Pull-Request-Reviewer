@@ -32,10 +32,14 @@ jobs:
           git diff origin/${{ github.event.pull_request.base.ref }}...${{ github.event.pull_request.head.ref }} > pr.diff
           DIFF_CONTENT=$(cat pr.diff)
           
-          # JSON escape the diff content
-          echo "diff_content<<EOF" >> $GITHUB_ENV
-          echo "$DIFF_CONTENT" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          if [ ! -s pr.diff ]; then
+            echo "No changes detected."
+            echo "diff_content=No changes" >> $GITHUB_ENV
+          else
+            echo "diff_content<<EOF" >> $GITHUB_ENV
+            cat pr.diff >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
 
       - name: Send Diff to Lambda
         id: review
