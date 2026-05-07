@@ -52,11 +52,15 @@ jobs:
           
           diff_text = os.environ['diff_content']
           url = os.environ['LAMBDA_URL']
+          
           if not url:
               print('Error: LAMBDA_URL is empty')
-              exit(1
+              exit(1)
 
           data = {'diff': diff_text}
+          # Note: We send 'body' because your Lambda does json.loads(event.get('body'))
+          payload = json.dumps({'body': json.dumps(data)})
+
           req = urllib.request.Request(
               url, 
               data=json.dumps({'body': json.dumps(data)}).encode('utf-8'), 
@@ -77,13 +81,13 @@ jobs:
           except Exception as e:
               print(f'Request failed: {e}')
               exit(1)
-          " 
+          "
       - name: Save Review to Env
         run: |
           echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
           cat review_output.txt >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-
+          
       - name: Post Comment on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
