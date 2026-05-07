@@ -43,7 +43,8 @@ jobs:
       - name: Send Diff to Lambda
         id: review
         env:
-          LAMBDA_URL: ${{ secrets.AWS_LAMBDA_FUNCTION_URL }} # Stored in GitHub Secrets
+          LAMBDA_URL: ${{ secrets.AWS_LAMBDA_FUNCTION_URL }} # Stored
+          diff_content: ${{ env.diff_content }} in GitHub Secrets
         run: |
           # Use Python to safely package and send the JSON payload
           python3 -c "
@@ -51,7 +52,10 @@ jobs:
           
           diff_text = os.environ['diff_content']
           url = os.environ['LAMBDA_URL']
-          
+          if not url:
+              print('Error: LAMBDA_URL is empty')
+              exit(1
+
           data = {'diff': diff_text}
           req = urllib.request.Request(
               url, 
@@ -60,13 +64,25 @@ jobs:
               method='POST'
           )
           
-          with urllib.request.urlopen(req) as response:
-              res = json.loads(response.read().decode('utf-8'))
-              body = json.loads(res['body'])
-              print('REVIEW<<EOF')
-              print(body['review'])
-              print('EOF')
-          " >> $GITHUB_ENV
+          try:
+              with urllib.request.urlopen(req) as response:
+                  res = json.loads(response.read().decode('utf-8'))
+                  # Handle both direct response or Lambda Proxy response
+                  body = json.loads(res['body']) if 'body' in res else res
+                  
+                  # We print to a temporary file instead of GITHUB_ENV 
+                  # to avoid issues with large AI responses
+                  with open('review_output.txt', 'w') as f:
+                      f.write(body.get('review', 'No review generated.'))
+          except Exception as e:
+              print(f'Request failed: {e}')
+              exit(1)
+          " 
+      - name: Save Review to Env
+        run: |
+          echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
+          cat review_output.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Post Comment on PR
         uses: peter-evans/create-or-update-comment@v4
