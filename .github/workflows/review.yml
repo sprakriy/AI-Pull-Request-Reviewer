@@ -27,9 +27,12 @@ jobs:
       - name: Extract Pull Request Diff
         id: diff
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          # Generate diff from common ancestor to head
-          git diff origin/${{ github.event.pull_request.base.ref }}...${{ github.event.pull_request.head.ref }} > pr.diff
+          # 1. Fetch the exact base commit from the PR event
+          # We use the SHA instead of the branch name to avoid "ambiguous" errors
+          git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1
+
+          # 2. Diff the base SHA against the head SHA
+          git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > pr.diff
           DIFF_CONTENT=$(cat pr.diff)
           
           if [ ! -s pr.diff ]; then
