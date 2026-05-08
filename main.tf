@@ -14,6 +14,7 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
+  lifecycle { prevent_destroy = true }
 }
 
 # IAM Policy to allow invoking Amazon Bedrock
@@ -32,6 +33,7 @@ resource "aws_iam_policy" "bedrock_policy" {
       }
     ]
   })
+  lifecycle { prevent_destroy = true }
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_bedrock_attach" {
@@ -42,8 +44,8 @@ resource "aws_iam_role_policy_attachment" "lambda_bedrock_attach" {
 # Archive Lambda Code
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file = "${path.module}/src/lambda_function.py"
-  output_path = "${path.module}/src/lambda_function.zip"
+  source_file = "${path.module}/modules/pr_reviewer/src/lambda_function.py"
+  output_path = "${path.module}/build/lambda_function.zip"
 }
 
 # AWS Lambda Function
