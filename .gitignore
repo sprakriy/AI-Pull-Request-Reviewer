@@ -19,7 +19,10 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-
+build/
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+modules/pr_reviewer/src/.venv/
+build/
+*.zip

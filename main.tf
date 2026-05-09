@@ -14,7 +14,7 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
-  lifecycle { prevent_destroy = true }
+  #lifecycle { prevent_destroy = true }
 }
 
 # IAM Policy to allow invoking Amazon Bedrock
@@ -33,7 +33,7 @@ resource "aws_iam_policy" "bedrock_policy" {
       }
     ]
   })
-  lifecycle { prevent_destroy = true }
+  #lifecycle { prevent_destroy = true }
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_bedrock_attach" {
