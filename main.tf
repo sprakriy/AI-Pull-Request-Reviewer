@@ -14,7 +14,15 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
-  #lifecycle { prevent_destroy = true }
+  lifecycle { prevent_destroy = true }
+}
+
+resource "aws_lambda_permission" "allow_public_access" {
+  statement_id           = "FunctionURLAllowPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.reviewer_function.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
 }
 
 # IAM Policy to allow invoking Amazon Bedrock
@@ -33,7 +41,7 @@ resource "aws_iam_policy" "bedrock_policy" {
       }
     ]
   })
-  #lifecycle { prevent_destroy = true }
+  lifecycle { prevent_destroy = true }
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_bedrock_attach" {
