@@ -76,18 +76,24 @@ jobs:
               response = client.invoke(
                   FunctionName=function_name,
                   InvocationType='RequestResponse',
-                  Payload=json.dumps(payload)
+                  Payload=json.dumps({'body': json.dumps({'diff': diff_text})})
               )
               
               # Read the streaming response
               res_payload = json.loads(response['Payload'].read().decode('utf-8'))
-              
+              print(f"DEBUG: Raw Lambda Output: {res_payload}")
+
               # Extract the 'body' from the Lambda Proxy response
               # Your Lambda returns: return {'statusCode': 200, 'body': json.dumps({'review': ...})}
-              body = json.loads(res_payload['body'])
-              
+              if 'body' in res_payload:
+                  # The body itself is a JSON string, so we must load it again
+                  inner_body = json.loads(res_payload['body'])
+                  review = inner_body.get('review', 'Error: No review key in body.')
+              else:
+                  review = f"Error: No body in Lambda response. Full response: {res_payload}"
+
               with open('review_output.txt', 'w') as f:
-                  f.write(body.get('review', 'No review generated.'))
+                  f.write(review)
                   
           except Exception as e:
               print(f'Invocation failed: {e}')
