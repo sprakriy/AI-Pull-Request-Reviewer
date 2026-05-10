@@ -17,6 +17,14 @@ resource "aws_iam_role" "lambda_role" {
   #lifecycle { prevent_destroy = true }
 }
 
+resource "aws_lambda_permission" "allow_public_access" {
+  statement_id           = "FunctionURLAllowPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.reviewer_function.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
 # IAM Policy to allow invoking Amazon Bedrock
 resource "aws_iam_policy" "bedrock_policy" {
   name = "ai-pr-reviewer-bedrock-policy"
@@ -61,7 +69,7 @@ resource "aws_lambda_function" "reviewer_function" {
   environment {
     variables = {
       #BEDROCK_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
-      BEDROCK_MODEL_ID = "anthropic.claude-sonnet-4-6"
+      BEDROCK_MODEL_ID = "global.anthropic.claude-sonnet-4-20250514-v1:0"
     }
   }
 }
@@ -70,6 +78,15 @@ resource "aws_lambda_function" "reviewer_function" {
 resource "aws_lambda_function_url" "reviewer_url" {
   function_name      = aws_lambda_function.reviewer_function.function_name
   authorization_type = "NONE" # You can secure this using AWS IAM or IP allowlisting in production
+  invoke_mode        = "RESPONSE_STREAM"
+
+  # Using a CORS setting to force the resource to "touch" the API
+  cors {
+    allow_origins = ["*"]
+  }
+
+  # This ensures the permission exists before the URL is "touched"
+  depends_on = [aws_lambda_permission.allow_public_access]
 }
 
 output "function_url" {

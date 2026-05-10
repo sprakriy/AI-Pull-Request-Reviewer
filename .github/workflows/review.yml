@@ -27,74 +27,84 @@ jobs:
       - name: Extract Pull Request Diff
         id: diff
         run: |
-          # With fetch-depth: 0, all commits are already local.
-          # Just run the diff between the base and head SHAs.
-          git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > pr.diff
+          # Fetch the base branch explicitly so git can see it
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          
+          # Compare the current state of the PR branch to the base branch
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
           
           if [ ! -s pr.diff ]; then
             echo "No changes detected."
             echo "diff_content=No changes" >> $GITHUB_ENV
           else
-            echo "diff_content<<EOF" >> $GITHUB_ENV
+            echo "diff_content<<DISTINCT_DELIMITER" >> $GITHUB_ENV
             cat pr.diff >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            echo "DISTINCT_DELIMITER" >> $GITHUB_ENV
+            
+            # Debug: Print the diff to the logs so you can see it!
+            echo "--- DEBUG: DIFF START ---"
+            cat pr.diff
+            echo "--- DEBUG: DIFF END ---"
           fi
 
       - name: Send Diff to Lambda
         id: review
         env:
-          LAMBDA_URL: ${{ secrets.AWS_LAMBDA_FUNCTION_URL }} # Stored
+          # Use the actual Function Name instead of the URL
+          LAMBDA_FUNCTION_NAME: "ai-pr-reviewer-dev"
           diff_content: ${{ env.diff_content }} in GitHub Secrets
         run: |
+          # Install the AWS SDK for Python
+          pip3 install boto3
           # Use Python to safely package and send the JSON payload
           python3 -c "
-          import json, urllib.request, os
+          import json, boto3, os, base64
           
           diff_text = os.environ['diff_content']
-          url = os.environ['LAMBDA_URL']
+          function_name = os.environ['LAMBDA_FUNCTION_NAME']
           
-          if not url:
-              print('Error: LAMBDA_URL is empty')
-              exit(1)
-
-          data = {'diff': diff_text}
-          # Note: We send 'body' because your Lambda does json.loads(event.get('body'))
-          payload = json.dumps({'body': json.dumps(data)})
-
-          req = urllib.request.Request(
-              url, 
-              data=json.dumps({'body': json.dumps(data)}).encode('utf-8'), 
-              headers={'Content-Type': 'application/json'}, 
-              method='POST'
-          )
+          # Initialize Boto3 Client using the OIDC credentials from the previous step
+          client = boto3.client('lambda', region_name='us-east-1')
+          
+          # Format the payload exactly how your Lambda expects it
+          # Your Lambda does: body = json.loads(event.get('body', '{}'))
+          payload = {
+              'body': json.dumps({'diff': diff_text})
+          }
           
           try:
-              with urllib.request.urlopen(req) as response:
-                  res = json.loads(response.read().decode('utf-8'))
-                  # Handle both direct response or Lambda Proxy response
-                  body = json.loads(res['body']) if 'body' in res else res
+              response = client.invoke(
+                  FunctionName=function_name,
+                  InvocationType='RequestResponse',
+                  Payload=json.dumps({'body': json.dumps({'diff': diff_text})})
+              )
+              
+              # Read the streaming response
+              res_payload = json.loads(response['Payload'].read().decode('utf-8'))
+              print(f'DEBUG: Raw Lambda Output: {res_payload}')
+
+              # Extract the 'body' from the Lambda Proxy response
+              # Your Lambda returns: return {'statusCode': 200, 'body': json.dumps({'review': ...})}
+              if 'body' in res_payload:
+                  # The body itself is a JSON string, so we must load it again
+                  inner_body = json.loads(res_payload['body'])
+                  review = inner_body.get('review', 'Error: No review key in body.')
+              else:
+                  review = f'Error: No body in Lambda response. Full response: {res_payload}'
+
+              with open('review_output.txt', 'w') as f:
+                  f.write(review)
                   
-                  # We print to a temporary file instead of GITHUB_ENV 
-                  # to avoid issues with large AI responses
-                  with open('review_output.txt', 'w') as f:
-                      f.write(body.get('review', 'No review generated.'))
           except Exception as e:
-              print(f'Request failed: {e}')
+              print(f'Invocation failed: {e}')
               exit(1)
           "
-      - name: Save Review to Env
-        run: |
-          echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
-          cat review_output.txt >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
           
       - name: Post Comment on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            ## Automated AI PR Review
-
-            ${{ env.REVIEW }}
+          # Use the 'body-file' parameter instead of 'body'
+          body-file: 'review_output.txt' 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
