@@ -14,7 +14,7 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
-  lifecycle { prevent_destroy = true }
+  #lifecycle { prevent_destroy = true }
 }
 
 resource "aws_lambda_permission" "allow_public_access" {
@@ -41,7 +41,7 @@ resource "aws_iam_policy" "bedrock_policy" {
       }
     ]
   })
-  lifecycle { prevent_destroy = true }
+  #lifecycle { prevent_destroy = true }
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_bedrock_attach" {
@@ -77,6 +77,15 @@ resource "aws_lambda_function" "reviewer_function" {
 resource "aws_lambda_function_url" "reviewer_url" {
   function_name      = aws_lambda_function.reviewer_function.function_name
   authorization_type = "NONE" # You can secure this using AWS IAM or IP allowlisting in production
+  invoke_mode        = "RESPONSE_STREAM"
+
+  # Using a CORS setting to force the resource to "touch" the API
+  cors {
+    allow_origins = ["*"]
+  }
+
+  # This ensures the permission exists before the URL is "touched"
+  depends_on = [aws_lambda_permission.allow_public_access]
 }
 
 output "function_url" {
