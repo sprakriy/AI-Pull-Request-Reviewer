@@ -27,17 +27,24 @@ jobs:
       - name: Extract Pull Request Diff
         id: diff
         run: |
-          # With fetch-depth: 0, all commits are already local.
-          # Just run the diff between the base and head SHAs.
-          git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > pr.diff
+          # Fetch the base branch explicitly so git can see it
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          
+          # Compare the current state of the PR branch to the base branch
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
           
           if [ ! -s pr.diff ]; then
             echo "No changes detected."
             echo "diff_content=No changes" >> $GITHUB_ENV
           else
-            echo "diff_content<<EOF" >> $GITHUB_ENV
+            echo "diff_content<<DISTINCT_DELIMITER" >> $GITHUB_ENV
             cat pr.diff >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            echo "DISTINCT_DELIMITER" >> $GITHUB_ENV
+            
+            # Debug: Print the diff to the logs so you can see it!
+            echo "--- DEBUG: DIFF START ---"
+            cat pr.diff
+            echo "--- DEBUG: DIFF END ---"
           fi
 
       - name: Send Diff to Lambda
