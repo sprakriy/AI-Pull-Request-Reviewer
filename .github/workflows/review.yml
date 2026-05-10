@@ -47,6 +47,8 @@ jobs:
           LAMBDA_FUNCTION_NAME: "ai-pr-reviewer-dev"
           diff_content: ${{ env.diff_content }} in GitHub Secrets
         run: |
+          # Install the AWS SDK for Python
+          pip3 install boto3
           # Use Python to safely package and send the JSON payload
           python3 -c "
           import json, boto3, os, base64
