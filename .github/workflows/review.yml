@@ -81,7 +81,7 @@ jobs:
               
               # Read the streaming response
               res_payload = json.loads(response['Payload'].read().decode('utf-8'))
-              print(f"DEBUG: Raw Lambda Output: {res_payload}")
+              print(f'DEBUG: Raw Lambda Output: {res_payload}')
 
               # Extract the 'body' from the Lambda Proxy response
               # Your Lambda returns: return {'statusCode': 200, 'body': json.dumps({'review': ...})}
@@ -90,7 +90,7 @@ jobs:
                   inner_body = json.loads(res_payload['body'])
                   review = inner_body.get('review', 'Error: No review key in body.')
               else:
-                  review = f"Error: No body in Lambda response. Full response: {res_payload}"
+                  review = f'Error: No body in Lambda response. Full response: {res_payload}'
 
               with open('review_output.txt', 'w') as f:
                   f.write(review)
