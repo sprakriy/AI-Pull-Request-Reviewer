@@ -96,9 +96,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            ## Automated AI PR Review
-
-            ${{ env.REVIEW }}
+          # Use the 'body-file' parameter instead of 'body'
+          body-file: 'review_output.txt' 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
