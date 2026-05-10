@@ -86,11 +86,6 @@ jobs:
               print(f'Invocation failed: {e}')
               exit(1)
           "
-      - name: Save Review to Env
-        run: |
-          echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
-          cat review_output.txt >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
           
       - name: Post Comment on PR
         uses: peter-evans/create-or-update-comment@v4
