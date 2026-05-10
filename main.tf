@@ -69,7 +69,7 @@ resource "aws_lambda_function" "reviewer_function" {
   environment {
     variables = {
       #BEDROCK_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
-      BEDROCK_MODEL_ID = "anthropic.claude-sonnet-4-6"
+      BEDROCK_MODEL_ID = "global.anthropic.claude-sonnet-4-20250514-v1:0"
     }
   }
 }
